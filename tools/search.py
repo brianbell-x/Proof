@@ -25,7 +25,7 @@ class WebSearchTool:
         self.api_key = api_key
         self.base_url = base_url
 
-    def search(self, query: str, max_results: int = 5) -> Dict[str, Any]:
+    def search(self, query: str, max_results: int = None) -> Dict[str, Any]:
         """
         Perform a web search using OpenRouter's web search capabilities.
 
@@ -143,10 +143,8 @@ def get_tool_schema() -> Dict[str, Any]:
                     },
                     "max_results": {
                         "type": "integer",
-                        "description": "Maximum number of search results to return (default: 5)",
-                        "default": 5,
-                        "minimum": 1,
-                        "maximum": 10
+                        "description": "Maximum number of search results to return (optional, no limit)",
+                        "minimum": 1
                     }
                 },
                 "required": ["query"]

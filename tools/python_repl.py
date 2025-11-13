@@ -16,13 +16,13 @@ class PythonREPLTool:
     Useful for calculations, data analysis, and mathematical verification.
     """
 
-    def __init__(self, timeout: int = 10, max_output_length: int = 10000):
+    def __init__(self, timeout: int = 10, max_output_length: int = None):
         """
         Initialize the Python REPL tool.
 
         Args:
             timeout: Maximum execution time in seconds (not implemented yet)
-            max_output_length: Maximum length of output to return
+            max_output_length: Maximum length of output to return (optional, no limit)
         """
         self.timeout = timeout
         self.max_output_length = max_output_length
@@ -86,8 +86,8 @@ class PythonREPLTool:
             # Include any partial output
             result["output"] = stdout_capture.getvalue()
 
-        # Truncate output if too long
-        if len(result["output"]) > self.max_output_length:
+        # Truncate output if too long (only if max_output_length is set)
+        if self.max_output_length and len(result["output"]) > self.max_output_length:
             result["output"] = result["output"][:self.max_output_length] + "... (truncated)"
             result["truncated"] = True
 

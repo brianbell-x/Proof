@@ -25,7 +25,7 @@ log_file = os.path.join(log_dir, 'prover.log')
 
 try:
     os.makedirs(log_dir, exist_ok=True)
-    file_handler = logging.FileHandler(log_file)
+    file_handler = logging.FileHandler(log_file, mode='w')
 except (OSError, PermissionError) as e:
     print(f"Warning: Could not create log file {log_file}: {e}. Logging to console only.")
     file_handler = None
@@ -50,6 +50,22 @@ logging.getLogger().handlers[0].setLevel(console_level)
 PROVER_LOG_MAX_CHARS = int(os.getenv("PROVER_LOG_MAX_CHARS", "0"))  # 0 = no truncation
 
 logger = logging.getLogger(__name__)
+
+
+def _strip_markdown_code_fences(content: str) -> str:
+    """Strip markdown code fences (```json or ```) from content."""
+    if not content:
+        return content
+    content = content.strip()
+    if content.startswith("```"):
+        lines = content.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        content = "\n".join(lines)
+    return content.strip()
+
 
 class ProverAgent:
     """Agent that constructs rigorous proofs using tools for evidence gathering."""
@@ -89,15 +105,23 @@ class ProverAgent:
         start_time = time.time()
 
         try:
-            tool_name = tool_call.function.name
-            arguments = json.loads(tool_call.function.arguments)
+            if hasattr(tool_call, 'function'):
+                tool_name = tool_call.function.name
+                arguments = json.loads(tool_call.function.arguments)
+                tool_call_id = tool_call.id
+            elif isinstance(tool_call, dict):
+                tool_name = tool_call.get('function', {}).get('name')
+                arguments = json.loads(tool_call.get('function', {}).get('arguments', '{}'))
+                tool_call_id = tool_call.get('id')
+            else:
+                raise ValueError(f"Unexpected tool_call format: {type(tool_call)}")
 
-            logger.info(f"[TOOL CALL REQUEST][id={tool_call.id}][name={tool_name}] args={json.dumps(arguments)}")
+            logger.info(f"[TOOL CALL REQUEST][id={tool_call_id}][name={tool_name}] args={json.dumps(arguments)}")
 
             if tool_name not in self.tools:
                 result = {
                     "error": f"Unknown tool: {tool_name}",
-                    "tool_call_id": tool_call.id
+                    "tool_call_id": tool_call_id
                 }
             else:
                 tool = self.tools[tool_name]
@@ -109,29 +133,35 @@ class ProverAgent:
                 else:
                     result = {"error": f"Tool {tool_name} not implemented or not available for this model"}
 
-                result["tool_call_id"] = tool_call.id
+                result["tool_call_id"] = tool_call_id
                 result["tool_name"] = tool_name
 
             duration = time.time() - start_time
             result_payload = json.dumps(result)
             if PROVER_LOG_MAX_CHARS > 0 and len(result_payload) > PROVER_LOG_MAX_CHARS:
                 truncated_payload = result_payload[:PROVER_LOG_MAX_CHARS] + "... (truncated)"
-                logger.info(f"[TOOL RESULT][id={tool_call.id}][name={tool_name}][duration={duration:.3f}s] result={truncated_payload}")
+                logger.info(f"[TOOL RESULT][id={tool_call_id}][name={tool_name}][duration={duration:.3f}s] result={truncated_payload}")
             else:
-                logger.info(f"[TOOL RESULT][id={tool_call.id}][name={tool_name}][duration={duration:.3f}s] result={result_payload}")
+                logger.info(f"[TOOL RESULT][id={tool_call_id}][name={tool_name}][duration={duration:.3f}s] result={result_payload}")
 
             return result
 
         except Exception as e:
             duration = time.time() - start_time
-            logger.error(f"[TOOL RESULT][id={getattr(tool_call, 'id', 'unknown')}][name={getattr(tool_call.function, 'name', 'unknown') if hasattr(tool_call, 'function') else 'unknown'}][duration={duration:.3f}s] error={str(e)}")
+            tool_call_id = getattr(tool_call, 'id', None) if hasattr(tool_call, 'id') else (tool_call.get('id') if isinstance(tool_call, dict) else None)
+            tool_name = None
+            if hasattr(tool_call, 'function'):
+                tool_name = getattr(tool_call.function, 'name', None)
+            elif isinstance(tool_call, dict):
+                tool_name = tool_call.get('function', {}).get('name')
+            logger.error(f"[TOOL RESULT][id={tool_call_id or 'unknown'}][name={tool_name or 'unknown'}][duration={duration:.3f}s] error={str(e)}")
             return {
                 "error": str(e),
-                "tool_call_id": getattr(tool_call, "id", None),
-                "tool_name": getattr(tool_call.function, "name", None) if hasattr(tool_call, "function") else None
+                "tool_call_id": tool_call_id,
+                "tool_name": tool_name
             }
 
-    def prove_claim(self, claim: str, max_iterations: int = 5) -> Dict[str, Any]:
+    def prove_claim(self, claim: str, max_iterations: int = None) -> Dict[str, Any]:
         messages = [
             {
                 "role": "system",
@@ -147,7 +177,7 @@ class ProverAgent:
         final_result = None
         tools_used = set()
 
-        while iteration < max_iterations:
+        while True:
             iteration += 1
             logger.info(f"Starting iteration {iteration}")
 
@@ -163,15 +193,21 @@ class ProverAgent:
                 message_dict = message.model_dump() if hasattr(message, 'model_dump') else message
                 messages.append(message_dict)
 
-                # Log model output with full details
+                tool_calls = getattr(message, 'tool_calls', None)
+                if not tool_calls and isinstance(message_dict, dict):
+                    tool_calls = message_dict.get('tool_calls')
+
                 finish_reason = getattr(response.choices[0], 'finish_reason', 'unknown')
                 model_used = getattr(response, 'model', self.model)
                 content = message.content or ""
                 tool_calls_info = ""
-                if hasattr(message, 'tool_calls') and message.tool_calls:
+                if tool_calls:
                     tool_calls_list = []
-                    for tc in message.tool_calls:
-                        tool_calls_list.append(f"id={tc.id} name={tc.function.name} args={tc.function.arguments}")
+                    for tc in tool_calls:
+                        if hasattr(tc, 'function'):
+                            tool_calls_list.append(f"id={tc.id} name={tc.function.name} args={tc.function.arguments}")
+                        elif isinstance(tc, dict):
+                            tool_calls_list.append(f"id={tc.get('id', 'unknown')} name={tc.get('function', {}).get('name', 'unknown')}")
                     tool_calls_info = f" tool_calls=[{', '.join(tool_calls_list)}]"
 
                 if "verdict" in content:
@@ -180,7 +216,8 @@ class ProverAgent:
                     logger.info(f"[MODEL OUTPUT][iter={iteration}][finish_reason={finish_reason}][model={model_used}] content={content}{tool_calls_info}")
 
                 try:
-                    result = json.loads(content) if content else {}
+                    cleaned_content = _strip_markdown_code_fences(content)
+                    result = json.loads(cleaned_content) if cleaned_content else {}
                 except (json.JSONDecodeError, TypeError):
                     logger.warning(f"[MODEL OUTPUT][parse_error] Failed to parse JSON response: {content}")
                     result = {"error": "Invalid JSON response", "raw_content": content}
@@ -190,20 +227,30 @@ class ProverAgent:
                     logger.info("[FINAL RESULT] Verdict reached")
                     break
 
-                if hasattr(message, 'tool_calls') and message.tool_calls:
-                    logger.info(f"Processing {len(message.tool_calls)} tool calls")
+                if tool_calls:
+                    logger.info(f"Processing {len(tool_calls)} tool calls")
 
-                    for tool_call in message.tool_calls:
-                        tools_used.add(tool_call.function.name)
+                    for tool_call in tool_calls:
+                        if hasattr(tool_call, 'function'):
+                            tool_name = tool_call.function.name
+                            tool_call_id = tool_call.id
+                        elif isinstance(tool_call, dict):
+                            tool_name = tool_call.get('function', {}).get('name')
+                            tool_call_id = tool_call.get('id')
+                        else:
+                            logger.warning(f"Unexpected tool_call format: {type(tool_call)}")
+                            continue
+
+                        tools_used.add(tool_name)
                         tool_result = self._execute_tool(tool_call)
 
                         tool_message = {
                             "role": "tool",
-                            "tool_call_id": tool_call.id,
+                            "tool_call_id": tool_call_id,
                             "content": json.dumps(tool_result)
                         }
                         messages.append(tool_message)
-                        logger.info(f"[TOOL RESULT SENT][id={tool_call.id}] message={json.dumps(tool_message)}")
+                        logger.info(f"[TOOL RESULT SENT][id={tool_call_id}] message={json.dumps(tool_message)}")
 
                 else:
                     logger.info("No tool calls in response, continuing...")
@@ -223,7 +270,7 @@ class ProverAgent:
             return final_result
         else:
             partial = {
-                "error": "Maximum iterations reached without reaching a verdict",
+                "error": "No verdict reached",
                 "claim": claim,
                 "iterations_completed": iteration,
                 "partial_result": result if 'result' in locals() else None,
