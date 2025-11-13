@@ -19,6 +19,7 @@ A real time FUD destruction engine that stress tests claims through rigorous log
    ```bash
    python -m core.agent
    ```
+4. **Type a claim and see the proof tree**
 
 ## The Story:
 
@@ -60,4 +61,4 @@ It's not perfect. Not omniscient. But it's honest. Shows its work. Cites sources
 
 Still just a proof of concept. The real vision is bigger. Imagine X with Prove button on every post. Background system building proof trees for viral claims. Make truth seeking as easy as sharing misinformation.
 
-Considering the next iteration to make this a tool to seperate concerns from a chat model.
+Considering the next iteration to make this a tool (like agent as a tool) to seperate concerns from a chat model.
