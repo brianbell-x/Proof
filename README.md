@@ -1,6 +1,6 @@
 # Proof Tool
 
-A real time FUD destruction engine that stress tests claims through rigorous logical analysis and evidence gathering. Not a fact checker, a proof checker. Feed it any claim and get a transparent proof tree showing logical derivation or exposing shaky foundations. Built on falsification first skepticism: it tries to break claims before defending them, shows its work, cites sources, and admits when it doesn't know.
+A real time FUD destruction tool for ai models. Not a fact checker, a proof generator. 
 
 ## Quick Start
 
