@@ -132,9 +132,10 @@ class ChatAgent:
                     prompt_tokens += pt
                     completion_tokens += ct
                     
+                    tool_call_id = tool_call.id if hasattr(tool_call, "id") else tool_call.get("id")
                     tool_message = {
                         "role": "tool",
-                        "tool_call_id": tool_result["tool_call_id"],
+                        "tool_call_id": tool_call_id,
                         "content": json.dumps(tool_result),
                     }
                     self.messages.append(tool_message)
@@ -166,23 +167,25 @@ class ChatAgent:
         
         if tool_name == "prove_claim":
             logger.info(f"[TOOL CALL] prove_claim with claim: {arguments.get('claim', '')[:50]}...")
-            tool_result = self.proof_tool.prove_claim(
+            content, metadata = self.proof_tool.prove_claim(
                 claim=arguments.get("claim", ""),
                 max_iterations=arguments.get("max_iterations"),
             )
-            proof_tokens = tool_result.get("tokens", {})
+            proof_tokens = metadata.get("tokens", {})
             pt = proof_tokens.get("prompt", 0)
             ct = proof_tokens.get("completion", 0)
             logger.info(f"[COST TRACKING] Added proof tokens: prompt={pt}, completion={ct}")
+            tool_result = content
         else:
             tool_result = {"error": f"Unknown tool: {tool_name}"}
             pt, ct = 0, 0
         
-        tool_result["tool_call_id"] = tool_call_id
-        tool_result["tool_name"] = tool_name
         duration = time.time() - tool_call_start
         
-        _write_log(f"## TOOL RESULT \n\n ### id \n {tool_call_id} \n\n ### name \n {tool_name} \n\n ### duration \n {duration:.3f}s \n\n ### result \n```json\n{json.dumps(tool_result, indent=2)}\n```\n\n")
+        tool_result_for_log = tool_result.copy()
+        tool_result_for_log["tool_call_id"] = tool_call_id
+        tool_result_for_log["tool_name"] = tool_name
+        _write_log(f"## TOOL RESULT \n\n ### id \n {tool_call_id} \n\n ### name \n {tool_name} \n\n ### duration \n {duration:.3f}s \n\n ### result \n```json\n{json.dumps(tool_result_for_log, indent=2)}\n```\n\n")
         
         return (tool_result, pt, ct)
 

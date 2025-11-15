@@ -1,6 +1,6 @@
 # Proof Tool
 
-A real time FUD destruction tool for ai models. Not a fact checker, a proof generator. 
+A real time FUD debunker tool for ai models. Not a fact checker, a proof generator. 
 
 ## Quick Start
 
@@ -21,11 +21,11 @@ A real time FUD destruction tool for ai models. Not a fact checker, a proof gene
    ```
 4. **Chat with the agent and ask it about anything you want proof of**
 
-## The Story:
+## The Diary:
 
-Frustrated with social media. Every day feeds full of confident claims, some true, some false, most somewhere in between. Grok does quick searches (can be poisoned). Community Notes are gamed. What if we could go deeper? Build something that doesn't just cite sources but actually derives truth from first principles?
+ Every day I see stuff on socials and wonder "is this really true?"...  "@Grok is this true" can do quick searches (can be poisoned). Community Notes can be gamed. What if we could go deeper? Build something that doesn't just cite sources but actually seeks to build a proof, kinda like math dudes build proofs for their theorems.
 
-The vision: real time FUD destruction engine. Ask any claim, get a proof tree in 5 seconds showing logical derivation or exposing the foundation as sand. Not a fact checker. A proof checker.
+The vision: real time FUD debunker. Ask any claim, get a proof tree in 5 seconds showing logical derivation or exposing the foundation as sand. Not a fact checker. A proof generator.
 
 Starting simple. Just a CLI that takes text input, outputs proof tree. No UI, no polish. Core question: can AI construct rigorous proofs?
 
@@ -68,3 +68,9 @@ After testing this a bit more... I need the date and time to be injected into th
 Okay its an agent as a tool now. I'm noticing that this may be able to prove alot more than just claims... It may be able to test theories, hypotheses, and even theories about theories... Gonna need help math and physics experts on that. But I wrote a few simple tests to see ifs possible... and it seems to be. So we'll see.
 
 I want to create a UI for the outputs somehow. 
+
+Just heard about grok 5... if it can actually take videos as input, that would be a game changer for this. An issue that Im running into is that it doesn't natively support file input. (could setup manual processing but im trying to prove a concept rn)... But I'm imagining the model being able to basically watch a video and make a verdict from it. Or could read massive PDFs... 
+
+Kinda glad this model is this cheap tho, it makes is possible for a brokey like me to build this and possibly make it public. each proof costs less than a penny. its like $0.006~... but i am only testing... we'll see.
+
+resource limitation is one of my biggest challenges. Prompting the model to account for this for now, but I hope to slowly increase the resources available to the model as I find out what it needs.

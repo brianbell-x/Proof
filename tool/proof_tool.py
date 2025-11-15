@@ -428,7 +428,7 @@ class ProofAgent:
 
     def prove_claim(
         self, claim: str, max_iterations: Optional[int] = None
-    ) -> Dict[str, Any]:
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         with open(log_file, "w", encoding="utf-8") as f:
             f.write(f"# Proof Session\n\n### Claim\n{claim}\n\n")
 
@@ -556,18 +556,26 @@ class ProofAgent:
                 cost_info = self._calculate_costs(
                     total_prompt_tokens, total_completion_tokens
                 )
-                return {
-                    "error": str(e),
-                    "claim": claim,
+                tokens_info = {
+                    "prompt": total_prompt_tokens,
+                    "completion": total_completion_tokens,
+                    "total": total_prompt_tokens + total_completion_tokens,
+                }
+                metadata = {
                     "iterations_completed": iteration,
                     "time_seconds": round(elapsed_time, 3),
-                    "tokens": {
-                        "prompt": total_prompt_tokens,
-                        "completion": total_completion_tokens,
-                        "total": total_prompt_tokens + total_completion_tokens,
-                    },
+                    "tokens": tokens_info,
                     "cost": cost_info,
                 }
+                content = {
+                    "error": str(e),
+                    "claim": claim,
+                }
+                metadata_json = json.dumps(metadata, indent=2)
+                _write_log(
+                    f"## METADATA \n\n ```json\n{metadata_json}\n```\n\n"
+                )
+                return (content, metadata)
 
         end_time = time.time()
         elapsed_time = end_time - start_time
@@ -580,33 +588,31 @@ class ProofAgent:
             "total": total_prompt_tokens + total_completion_tokens,
         }
 
+        metadata = {
+            "iterations_used": iteration,
+            "tools_used": list(tools_used),
+            "time_seconds": round(elapsed_time, 3),
+            "tokens": tokens_info,
+            "cost": cost_info,
+        }
+
         if final_result:
-            final_result["iterations_used"] = iteration
-            final_result["tools_used"] = list(tools_used)
-            final_result["time_seconds"] = round(elapsed_time, 3)
-            final_result["tokens"] = tokens_info
-            final_result["cost"] = cost_info
-            result_json = json.dumps(final_result, indent=2)
+            metadata_json = json.dumps(metadata, indent=2)
             _write_log(
-                f"## FINAL RESULT \n\n ```json\n{result_json}\n```\n\n"
+                f"## METADATA \n\n ```json\n{metadata_json}\n```\n\n"
             )
-            return final_result
+            return (final_result, metadata)
         else:
-            partial = {
+            content = {
                 "error": "No verdict reached",
                 "claim": claim,
-                "iterations_completed": iteration,
                 "partial_result": result if "result" in locals() else None,
-                "tools_used": list(tools_used),
-                "time_seconds": round(elapsed_time, 3),
-                "tokens": tokens_info,
-                "cost": cost_info,
             }
-            result_json = json.dumps(partial, indent=2)
+            metadata_json = json.dumps(metadata, indent=2)
             _write_log(
-                f"## FINAL RESULT \n\n ```json\n{result_json}\n```\n\n"
+                f"## METADATA \n\n ```json\n{metadata_json}\n```\n\n"
             )
-            return partial
+            return (content, metadata)
 
 
 class ProofTool:
@@ -615,10 +621,10 @@ class ProofTool:
 
     def prove_claim(
         self, claim: str, max_iterations: Optional[int] = None
-    ) -> Dict[str, Any]:
-        result = self.proof_agent.prove_claim(claim, max_iterations)
-        result["timestamp"] = datetime.now().isoformat()
-        return result
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        content, metadata = self.proof_agent.prove_claim(claim, max_iterations)
+        metadata["timestamp"] = datetime.now().isoformat()
+        return (content, metadata)
 
 
 def get_tool_schema() -> Dict[str, Any]:
@@ -743,13 +749,19 @@ if __name__ == "__main__":
     agent._execute_tool = _wrapper_execute_tool
 
     print(f"[INLINE TEST] Running claim: {claim_text}")
-    final = agent.prove_claim(claim_text, max_iterations=args.max_iter)
+    content, metadata = agent.prove_claim(claim_text, max_iterations=args.max_iter)
 
-    print("\n[INLINE TEST] FINAL OUTPUT")
+    print("\n[INLINE TEST] FINAL OUTPUT (CONTENT)")
     try:
-        print(json.dumps(final, indent=2))
+        print(json.dumps(content, indent=2))
     except Exception:
-        print(final)
+        print(content)
+    
+    print("\n[INLINE TEST] METADATA")
+    try:
+        print(json.dumps(metadata, indent=2))
+    except Exception:
+        print(metadata)
 
     print("\n[INLINE TEST] TOOL USAGE SUMMARY")
     for evt in tool_events:
