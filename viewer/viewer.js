@@ -209,7 +209,12 @@ function renderStep(step, index, totalSteps) {
                     const tempDiv = document.createElement('div');
                     tempDiv.innerHTML = markdownHtml;
                     const firstHeading = tempDiv.querySelector('h1, h2, h3, h4, h5, h6');
-                    const summaryText = firstHeading ? firstHeading.textContent : `Search Results for: ${query}`;
+                    
+                    let cleanedMarkdown = markdownHtml;
+                    if (firstHeading && firstHeading.textContent.includes('Search Results for:')) {
+                        firstHeading.remove();
+                        cleanedMarkdown = tempDiv.innerHTML;
+                    }
                     
                     html += `<div class="search-query-wrapper">
                         <div class="search-query">
@@ -218,23 +223,15 @@ function renderStep(step, index, totalSteps) {
                         </div>
                     </div>
                     <details class="search-result-collapsible">
-                        <summary class="search-result-summary">${escapeHtml(summaryText)}</summary>
-                        <div class="search-result">${markdownHtml}</div>
+                        <summary class="search-result-summary">Search Results</summary>
+                        <div class="search-result">${cleanedMarkdown}</div>
                     </details>`;
                 }
-                html += `<div class="tool-meta">Duration: ${toolResult.duration}s | Success: ${toolResult.result.success ? 'Yes' : 'No'}</div>`;
+                html += `<div class="tool-meta">Duration: ${toolResult.duration}s</div>`;
             }
             html += `</div>`;
         });
         html += `</div>`;
-    }
-
-    // Reasoning
-    if (step.content.reasoning) {
-        html += `<details class="reasoning-collapsible">
-            <summary>Reasoning</summary>
-            <div class="reasoning-text">${escapeHtml(step.content.reasoning)}</div>
-        </details>`;
     }
 
     // Evidence/Derivation (final step only)
@@ -245,6 +242,14 @@ function renderStep(step, index, totalSteps) {
         if (step.content.evidence && step.content.evidence.length > 0) {
             html += `<div class="evidence-section"><h4>Evidence</h4><ul>${step.content.evidence.map(e => `<li><strong>${e.source}</strong>: ${escapeHtml(e.content)}</li>`).join('')}</ul></div>`;
         }
+    }
+
+    // Reasoning
+    if (step.content.reasoning) {
+        html += `<details class="reasoning-collapsible">
+            <summary>Reasoning</summary>
+            <div class="reasoning-text">${escapeHtml(step.content.reasoning)}</div>
+        </details>`;
     }
 
     html += `</div></details>`;
@@ -388,7 +393,7 @@ function renderProof(proof) {
     
     if (steps.length > 0) {
         html += `<div class="proof-section">
-            <h2>Proof Steps
+            <h2>Events:
                 <button id="toggleAllBtn" class="toggle-all-btn" onclick="toggleAllSteps()" aria-label="Toggle all steps">Expand All</button>
             </h2>`;
         steps.forEach((step, index) => {
