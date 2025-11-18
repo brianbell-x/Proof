@@ -8,7 +8,7 @@ from typing import Dict, Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from tool.proof_tool import ProofAgent, _strip_markdown_code_fences
+from tool.proof_tool import ProofTool, _strip_markdown_code_fences
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class TestProofAgentUnit(unittest.TestCase):
     def setUp(self):
         api_key = os.getenv("OPENROUTER_API_KEY", "test_key")
-        self.agent = ProofAgent(api_key)
+        self.agent = ProofTool(api_key)
 
     def test_initialization(self):
         self.assertIsNotNone(self.agent.api_key)
@@ -195,7 +195,7 @@ class TestProofAgentUnit(unittest.TestCase):
 class TestProofAgentEdgeCases(unittest.TestCase):
     def setUp(self):
         api_key = os.getenv("OPENROUTER_API_KEY", "test_key")
-        self.agent = ProofAgent(api_key)
+        self.agent = ProofTool(api_key)
 
     def test_prove_claim_empty_claim(self):
         mock_response = Mock()

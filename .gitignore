@@ -9,6 +9,6 @@ __pycache__/
 *.pyc
 
 # Temporary files
+tests
 temp
-docs
 digest.txt

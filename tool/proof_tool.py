@@ -5,24 +5,14 @@ import io
 import contextlib
 import traceback
 import requests
+import shortuuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from openai import OpenAI
 
-log_dir = "logs"
-log_file = os.path.join(log_dir, "proof-log.md")
-os.makedirs(log_dir, exist_ok=True)
-
-
-def _write_log(message: str) -> None:
-    try:
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(message)
-            f.flush()
-    except (OSError, PermissionError):
-        pass
-
+proofs_dir = "proofs"
+os.makedirs(proofs_dir, exist_ok=True)
 
 def _strip_markdown_code_fences(content: str) -> str:
     if not content:
@@ -37,18 +27,56 @@ def _strip_markdown_code_fences(content: str) -> str:
         content = "\n".join(lines)
     return content.strip()
 
-
-def _format_json_content(content: str) -> str:
-    if not content:
-        return content
-    if content.strip().startswith("```"):
-        return content
-    try:
-        cleaned = _strip_markdown_code_fences(content)
-        json.loads(cleaned)
-        return f"```json\n{content}\n```"
-    except (json.JSONDecodeError, TypeError):
-        return content
+class JSONLogger:
+    def __init__(self, proof_id: str, claim: str):
+        self.proof_id = proof_id
+        self.claim = claim
+        self.timestamp = datetime.now().isoformat()
+        self.events: List[Dict[str, Any]] = []
+        self.log_file = os.path.join(proofs_dir, f"{proof_id}.json")
+        
+    def _init_log(self) -> None:
+        log_data = {
+            "proof_id": self.proof_id,
+            "claim": self.claim,
+            "timestamp": self.timestamp,
+            "events": [],
+            "metadata": None,
+        }
+        try:
+            with open(self.log_file, "w", encoding="utf-8") as f:
+                json.dump(log_data, f, indent=2)
+        except (OSError, PermissionError):
+            pass
+    
+    def log_event(self, event_type: str, data: Dict[str, Any]) -> None:
+        event = {
+            "type": event_type,
+            **data
+        }
+        self.events.append(event)
+        self._save_log()
+    
+    def _save_log(self) -> None:
+        try:
+            with open(self.log_file, "r", encoding="utf-8") as f:
+                log_data = json.load(f)
+            log_data["events"] = self.events
+            with open(self.log_file, "w", encoding="utf-8") as f:
+                json.dump(log_data, f, indent=2)
+        except (OSError, PermissionError, json.JSONDecodeError):
+            pass
+    
+    def set_metadata(self, metadata: Dict[str, Any]) -> None:
+        try:
+            with open(self.log_file, "r", encoding="utf-8") as f:
+                log_data = json.load(f)
+            log_data["metadata"] = metadata
+            log_data["events"] = self.events
+            with open(self.log_file, "w", encoding="utf-8") as f:
+                json.dump(log_data, f, indent=2)
+        except (OSError, PermissionError, json.JSONDecodeError):
+            pass
 
 
 class WebSearchTool:
@@ -69,10 +97,12 @@ class WebSearchTool:
                     "messages": [
                         {
                             "role": "user",
-                            "content": f"Search the web for: {query}. Provide factual, recent information with sources.",
+                            "content": f"Return Search Results for: {query}",
                         }
                     ],
-                    "max_tokens": 100000,
+                    "usage": {
+                        "include": True
+                    }
                 },
             )
 
@@ -80,7 +110,6 @@ class WebSearchTool:
                 return {
                     "error": f"Search failed with status {response.status_code}",
                     "query": query,
-                    "timestamp": datetime.now().isoformat(),
                     "results": [],
                 }
 
@@ -90,7 +119,6 @@ class WebSearchTool:
 
             return {
                 "query": query,
-                "timestamp": datetime.now().isoformat(),
                 "content": content,
                 "results": self._parse_search_results(annotations, max_results),
             }
@@ -99,7 +127,6 @@ class WebSearchTool:
             return {
                 "error": str(e),
                 "query": query,
-                "timestamp": datetime.now().isoformat(),
                 "results": [],
             }
 
@@ -119,7 +146,6 @@ class WebSearchTool:
                     }
                 )
         return results[:max_results] if max_results else results
-
 
 def get_search_schema() -> Dict[str, Any]:
     return {
@@ -171,7 +197,6 @@ class CodeExecutionTool:
 
         result = {
             "code": code,
-            "timestamp": datetime.now().isoformat(),
             "success": False,
             "output": "",
             "error": "",
@@ -262,7 +287,7 @@ def get_python_schema() -> Dict[str, Any]:
     }
 
 
-class ProofAgent:
+class ProofTool:
     def __init__(self, api_key: str, model: str = "x-ai/grok-4-fast"):
         self.api_key = api_key
         self.model = model
@@ -282,15 +307,13 @@ class ProofAgent:
             {"current_date": current_date, "current_time": current_time},
         )
         self.tool_schemas = [get_search_schema(), get_python_schema()]
+        self.logger: Optional[JSONLogger] = None
 
     def _load_prompt(self, path: str) -> str:
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return f.read()
         except FileNotFoundError:
-            _write_log(
-                f"## ERROR \n\n ### type \n Prompt file not found \n\n ### path \n {path}\n\n"
-            )
             return ""
 
     def _interpolate(self, text: str, values: Dict[str, str]) -> str:
@@ -301,8 +324,14 @@ class ProofAgent:
         return text
 
     def _calculate_costs(
-        self, prompt_tokens: int, completion_tokens: int
+        self, prompt_tokens: int, completion_tokens: int, actual_cost: Optional[float] = None
     ) -> Dict[str, Any]:
+        if actual_cost is not None:
+            return {
+                "total_usd": round(actual_cost, 6),
+                "source": "api"
+            }
+        
         input_cost_per_million = 0.20
         output_cost_per_million = 0.50
         input_cost = (prompt_tokens / 1_000_000) * input_cost_per_million
@@ -312,6 +341,7 @@ class ProofAgent:
             "input_usd": round(input_cost, 6),
             "output_usd": round(output_cost, 6),
             "total_usd": round(total_cost, 6),
+            "source": "estimated"
         }
 
     def _parse_tool_call(self, tool_call: Any) -> Tuple[str, Dict, str]:
@@ -335,11 +365,6 @@ class ProofAgent:
         try:
             tool_name, arguments, tool_call_id = self._parse_tool_call(tool_call)
 
-            args_json = json.dumps(arguments, indent=2)
-            _write_log(
-                f"## TOOL CALL REQUEST \n\n ### id \n {tool_call_id} \n\n ### name \n {tool_name} \n\n ### args \n```json\n{args_json}\n```\n\n"
-            )
-
             if tool_name not in self.tools:
                 result = {
                     "error": f"Unknown tool: {tool_name}",
@@ -358,10 +383,14 @@ class ProofAgent:
                 result["tool_name"] = tool_name
 
             duration = time.time() - start_time
-            result_json = json.dumps(result, indent=2)
-            _write_log(
-                f"## TOOL RESULT \n\n ### id \n {tool_call_id} \n\n ### name \n {tool_name} \n\n ### duration \n {duration:.3f}s \n\n ### result \n```json\n{result_json}\n```\n\n"
-            )
+            
+            if self.logger:
+                self.logger.log_event("tool_result", {
+                    "tool_name": tool_name,
+                    "tool_call_id": tool_call_id,
+                    "duration": round(duration, 3),
+                    "result": result
+                })
 
             return result
 
@@ -373,14 +402,22 @@ class ProofAgent:
             except Exception:
                 tool_call_id = None
                 tool_name = None
-            _write_log(
-                f"## TOOL RESULT ERROR \n\n ### id \n {tool_call_id or 'unknown'} \n\n ### name \n {tool_name or 'unknown'} \n\n ### duration \n {duration:.3f}s \n\n ### error \n {str(e)}\n\n"
-            )
-            return {
+            
+            error_result = {
                 "error": str(e),
                 "tool_call_id": tool_call_id,
                 "tool_name": tool_name,
             }
+            
+            if self.logger:
+                self.logger.log_event("tool_result_error", {
+                    "tool_name": tool_name or "unknown",
+                    "tool_call_id": tool_call_id or "unknown",
+                    "duration": round(duration, 3),
+                    "error": str(e)
+                })
+            
+            return error_result
 
     def _handle_embedded_tool_calls(
         self, result: Dict, messages: List[Dict], tools_used: set
@@ -389,14 +426,15 @@ class ProofAgent:
             return False
 
         embedded_calls = result.get("tool_calls", [])
+        if not embedded_calls:
+            return False
+
+        processed_count = 0
         for emb in embedded_calls:
             if not (
                 isinstance(emb, dict)
                 and isinstance(emb.get("function"), dict)
             ):
-                _write_log(
-                    f"## WARNING \n\n ### Skipping invalid embedded tool call structure \n {type(emb)}\n\n"
-                )
                 continue
 
             emb_id = emb.get("id") or f"embedded_{int(time.time() * 1000)}"
@@ -419,18 +457,23 @@ class ProofAgent:
                     "content": json.dumps(tool_result),
                 }
                 messages.append(tool_message)
+                processed_count += 1
             except Exception as e:
-                _write_log(
-                    f"## EMBEDDED TOOL ERROR \n\n ### id \n {emb_id} \n\n ### name \n {emb_name} \n\n ### error \n {e}\n\n"
-                )
+                if self.logger:
+                    self.logger.log_event("embedded_tool_error", {
+                        "tool_call_id": emb_id,
+                        "tool_name": emb_name,
+                        "error": str(e)
+                    })
 
-        return True
+        return processed_count > 0
 
     def prove_claim(
         self, claim: str, max_iterations: Optional[int] = None
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        with open(log_file, "w", encoding="utf-8") as f:
-            f.write(f"# Proof Session\n\n### Claim\n{claim}\n\n")
+        proof_id = shortuuid.uuid()
+        self.logger = JSONLogger(proof_id, claim)
+        self.logger._init_log()
 
         start_time = time.time()
         messages = [
@@ -443,6 +486,7 @@ class ProofAgent:
         tools_used = set()
         total_prompt_tokens = 0
         total_completion_tokens = 0
+        total_cost = 0.0
 
         while True:
             iteration += 1
@@ -453,8 +497,16 @@ class ProofAgent:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
-                    tools=self.tool_schemas,
-                    tool_choice="auto",
+                    temperature=0,
+                    response_format={"type": "json_object"},
+                    extra_body={
+                        "reasoning": {
+                            "effort": "high"
+                        },
+                        "usage": {
+                            "include": True
+                        }
+                    },
                 )
 
                 if hasattr(response, "usage") and response.usage:
@@ -463,6 +515,9 @@ class ProofAgent:
                     total_completion_tokens += getattr(
                         usage, "completion_tokens", 0
                     )
+                    api_cost = getattr(usage, "cost", None)
+                    if api_cost is not None:
+                        total_cost += api_cost
 
                 message = response.choices[0].message
                 message_dict = (
@@ -472,89 +527,44 @@ class ProofAgent:
                 )
                 messages.append(message_dict)
 
-                tool_calls = getattr(message, "tool_calls", None)
-                if not tool_calls and isinstance(message_dict, dict):
-                    tool_calls = message_dict.get("tool_calls")
-
                 content = message.content or ""
-                tool_calls_info = ""
-                if tool_calls:
-                    tool_calls_list = []
-                    for tc in tool_calls:
-                        if hasattr(tc, "function"):
-                            tool_calls_list.append(
-                                f"id={tc.id} name={tc.function.name} args={tc.function.arguments}"
-                            )
-                        elif isinstance(tc, dict):
-                            tool_calls_list.append(
-                                f"id={tc.get('id', 'unknown')} name={tc.get('function', {}).get('name', 'unknown')}"
-                            )
-                    tool_calls_info = (
-                        f" tool_calls=[{', '.join(tool_calls_list)}]"
-                    )
-
-                formatted_content = _format_json_content(content)
-                _write_log(
-                    f"## MODEL OUTPUT \n\n {formatted_content}{tool_calls_info}\n\n"
-                )
-
+                
                 try:
                     cleaned_content = _strip_markdown_code_fences(content)
                     result = json.loads(cleaned_content) if cleaned_content else {}
                 except (json.JSONDecodeError, TypeError):
-                    _write_log(
-                        f"## MODEL OUTPUT PARSE ERROR \n\n ### Failed to parse JSON response \n {content}\n\n"
-                    )
                     result = {"error": "Invalid JSON response", "raw_content": content}
+                    if self.logger:
+                        self.logger.log_event("model_output_parse_error", {
+                            "content": content,
+                            "error": "Failed to parse JSON response"
+                        })
 
-                if "verdict" in result:
+                if self.logger:
+                    self.logger.log_event("model_output", {
+                        "content": result
+                    })
+
+                verdict = result.get("verdict") if isinstance(result, dict) else None
+                if verdict is not None:
                     final_result = result
                     break
 
-                if (
-                    not tool_calls
-                    and isinstance(result, dict)
-                    and self._handle_embedded_tool_calls(result, messages, tools_used)
-                ):
-                    continue
-
-                if tool_calls:
-                    for tool_call in tool_calls:
-                        try:
-                            tool_name, _, tool_call_id = self._parse_tool_call(
-                                tool_call
-                            )
-                        except Exception:
-                            _write_log(
-                                f"## WARNING \n\n ### Unexpected tool_call format \n {type(tool_call)}\n\n"
-                            )
-                            continue
-
-                        tools_used.add(tool_name)
-                        tool_result = self._execute_tool(tool_call)
-                        tool_message = {
-                            "role": "tool",
-                            "tool_call_id": tool_call_id,
-                            "content": json.dumps(tool_result),
-                        }
-                        messages.append(tool_message)
-                        message_json = json.dumps(tool_message, indent=2)
-                        _write_log(
-                            f"## TOOL RESULT SENT \n\n ### id \n {tool_call_id} \n\n ### message \n```json\n{message_json}\n```\n\n"
-                        )
-                else:
-                    _write_log(
-                        "## NO TOOL CALLS \n\n ### No tool calls in response, continuing...\n\n"
-                    )
+                embedded_tool_calls = result.get("tool_calls", []) if isinstance(result, dict) else []
+                if isinstance(result, dict) and embedded_tool_calls:
+                    if self._handle_embedded_tool_calls(result, messages, tools_used):
+                        continue
 
             except Exception as e:
-                _write_log(
-                    f"## ITERATION ERROR \n\n ### error \n {e}\n\n"
-                )
+                if self.logger:
+                    self.logger.log_event("iteration_error", {
+                        "error": str(e)
+                    })
+                
                 end_time = time.time()
                 elapsed_time = end_time - start_time
                 cost_info = self._calculate_costs(
-                    total_prompt_tokens, total_completion_tokens
+                    total_prompt_tokens, total_completion_tokens, total_cost if total_cost > 0 else None
                 )
                 tokens_info = {
                     "prompt": total_prompt_tokens,
@@ -562,25 +572,25 @@ class ProofAgent:
                     "total": total_prompt_tokens + total_completion_tokens,
                 }
                 metadata = {
-                    "iterations_completed": iteration,
                     "time_seconds": round(elapsed_time, 3),
                     "tokens": tokens_info,
                     "cost": cost_info,
+                    "timestamp": datetime.now().isoformat(),
                 }
                 content = {
                     "error": str(e),
                     "claim": claim,
                 }
-                metadata_json = json.dumps(metadata, indent=2)
-                _write_log(
-                    f"## METADATA \n\n ```json\n{metadata_json}\n```\n\n"
-                )
+                
+                if self.logger:
+                    self.logger.set_metadata(metadata)
+                
                 return (content, metadata)
 
         end_time = time.time()
         elapsed_time = end_time - start_time
         cost_info = self._calculate_costs(
-            total_prompt_tokens, total_completion_tokens
+            total_prompt_tokens, total_completion_tokens, total_cost if total_cost > 0 else None
         )
         tokens_info = {
             "prompt": total_prompt_tokens,
@@ -589,18 +599,15 @@ class ProofAgent:
         }
 
         metadata = {
-            "iterations_used": iteration,
-            "tools_used": list(tools_used),
             "time_seconds": round(elapsed_time, 3),
             "tokens": tokens_info,
             "cost": cost_info,
+            "timestamp": datetime.now().isoformat(),
         }
 
         if final_result:
-            metadata_json = json.dumps(metadata, indent=2)
-            _write_log(
-                f"## METADATA \n\n ```json\n{metadata_json}\n```\n\n"
-            )
+            if self.logger:
+                self.logger.set_metadata(metadata)
             return (final_result, metadata)
         else:
             content = {
@@ -608,23 +615,9 @@ class ProofAgent:
                 "claim": claim,
                 "partial_result": result if "result" in locals() else None,
             }
-            metadata_json = json.dumps(metadata, indent=2)
-            _write_log(
-                f"## METADATA \n\n ```json\n{metadata_json}\n```\n\n"
-            )
+            if self.logger:
+                self.logger.set_metadata(metadata)
             return (content, metadata)
-
-
-class ProofTool:
-    def __init__(self, api_key: str, model: str = "x-ai/grok-4-fast"):
-        self.proof_agent = ProofAgent(api_key, model)
-
-    def prove_claim(
-        self, claim: str, max_iterations: Optional[int] = None
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        content, metadata = self.proof_agent.prove_claim(claim, max_iterations)
-        metadata["timestamp"] = datetime.now().isoformat()
-        return (content, metadata)
 
 
 def get_tool_schema() -> Dict[str, Any]:
@@ -656,29 +649,22 @@ if __name__ == "__main__":
     import argparse
     import logging
     import sys
+    from dotenv import load_dotenv
 
-    try:
-        from dotenv import load_dotenv
-
-        load_dotenv()
-    except Exception:
-        pass
+    load_dotenv()
 
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        print("[INLINE TEST] OPENROUTER_API_KEY not set. Skipping live test.")
+        print("OPENROUTER_API_KEY not set. Skipping live test.")
         sys.exit(0)
 
     parser = argparse.ArgumentParser(description="Inline ProofAgent tool-call verifier")
     parser.add_argument("claim", nargs="*", help="Claim text to analyze")
-    parser.add_argument(
-        "--max-iter", type=int, default=4, help="Maximum reasoning iterations"
-    )
     args = parser.parse_args()
 
-    claim_text = " ".join(args.claim).strip() or "Binary search is O(n)."
+    claim_text = " ".join(args.claim).strip() or "Donald Trump is racist."
 
-    agent = ProofAgent(api_key)
+    agent = ProofTool(api_key)
 
     try:
         for h in logging.getLogger().handlers:
@@ -708,7 +694,7 @@ if __name__ == "__main__":
                 tool_call_id = None
                 arguments = {}
         except Exception as e:
-            print(f"[INLINE TEST] Error parsing tool_call: {e}")
+            print(f"Error parsing tool_call: {e}")
             tool_name = "unknown"
             tool_call_id = None
             arguments = {}
@@ -721,7 +707,7 @@ if __name__ == "__main__":
         except Exception:
             preview = "<unavailable>"
 
-        print("\n[INLINE TEST] TOOL CALL")
+        print("\nTOOL CALL")
         print(f"  id={tool_call_id} name={tool_name}")
         if tool_name == "python_execute":
             print(
@@ -734,7 +720,7 @@ if __name__ == "__main__":
             keys = list(result.keys()) if isinstance(result, dict) else []
         except Exception:
             keys = []
-        print("[INLINE TEST] TOOL RESULT keys:", keys)
+        print("TOOL RESULT keys:", keys)
         tool_events.append(
             {
                 "tool_call_id": tool_call_id,
@@ -748,23 +734,28 @@ if __name__ == "__main__":
 
     agent._execute_tool = _wrapper_execute_tool
 
-    print(f"[INLINE TEST] Running claim: {claim_text}")
-    content, metadata = agent.prove_claim(claim_text, max_iterations=args.max_iter)
+    test_cases = [
+        ("The President of the United States is Bill Clinton", "web_search"),
+        ("2025 is a prime number", "code_execution"),
+    ]
 
-    print("\n[INLINE TEST] FINAL OUTPUT (CONTENT)")
-    try:
-        print(json.dumps(content, indent=2))
-    except Exception:
-        print(content)
-    
-    print("\n[INLINE TEST] METADATA")
-    try:
-        print(json.dumps(metadata, indent=2))
-    except Exception:
-        print(metadata)
+    for test_claim, test_type in test_cases:
+        print(f"\n{'='*80}")
+        print(f"Running {test_type} test: {test_claim}")
+        print(f"{'='*80}")
+        
+        content, metadata = agent.prove_claim(test_claim)
 
-    print("\n[INLINE TEST] TOOL USAGE SUMMARY")
-    for evt in tool_events:
-        print(
-            f"  id={evt['tool_call_id']} name={evt['tool_name']} has_code={evt['has_code']} result_keys={evt['result_keys']}"
-        )
+        print("\nFINAL OUTPUT (CONTENT)")
+        try:
+            print(json.dumps(content, indent=2))
+        except Exception:
+            print(content)
+        
+        print("\nMETADATA")
+        try:
+            print(json.dumps(metadata, indent=2))
+        except Exception:
+            print(metadata)
+        
+        print(f"\n{'='*80}\n")

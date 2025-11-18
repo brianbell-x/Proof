@@ -69,8 +69,8 @@ Okay its an agent as a tool now. I'm noticing that this may be able to prove alo
 
 I want to create a UI for the outputs somehow. 
 
-Just heard about grok 5... if it can actually take videos as input, that would be a game changer for this. An issue that Im running into is that it doesn't natively support file input. (could setup manual processing but im trying to prove a concept rn)... But I'm imagining the model being able to basically watch a video and make a verdict from it. Or could read massive PDFs... 
+Just heard about grok 5... if it can actually take videos as input, that would be a game changer for this. An issue that Im running into is that it doesn't natively support file input. (could setup manual processing but im trying to prove a concept rn)... I'm imagining that alot of info needed to make a verdict could be gathered from a video or pdf. Right now when we use web search we're mostly pulling blog posts and news articles.
 
 Kinda glad this model is this cheap tho, it makes is possible for a brokey like me to build this and possibly make it public. each proof costs less than a penny. its like $0.006~... but i am only testing... we'll see.
 
-resource limitation is one of my biggest challenges. Prompting the model to account for this for now, but I hope to slowly increase the resources available to the model as I find out what it needs.
+resource limitation is gonna one of my biggest challenges on making this big. Prompting the model to account for this for now, but I hope to slowly increase the resources available to the model as I find out what it needs.

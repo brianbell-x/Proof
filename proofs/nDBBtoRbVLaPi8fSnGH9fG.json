@@ -1,0 +1,164 @@
+{
+  "proof_id": "nDBBtoRbVLaPi8fSnGH9fG",
+  "claim": "The President of the United States is Bill Clinton",
+  "timestamp": "2025-11-17T18:51:41.897655",
+  "events": [
+    {
+      "type": "model_output",
+      "content": {
+        "claim": "The President of the United States is Bill Clinton",
+        "current_step": "Verifying the current president of the United States as of 2025-11-17",
+        "assumptions": [],
+        "tool_calls": [
+          {
+            "id": "search_current_president",
+            "type": "function",
+            "function": {
+              "name": "web_search",
+              "arguments": "{\"query\": \"site:gov OR site:whitehouse.gov \\\"current president of the United States\\\" 2025\", \"max_results\": 10}"
+            }
+          }
+        ],
+        "evidence": [],
+        "derivation": [],
+        "falsifiable_test": null,
+        "verdict": null,
+        "reasoning": "This is a factual claim about the current holder of a political office. To test it, I need to confirm who the president is as of the current date (2025-11-17). Bill Clinton served from 1993-2001, so intuitively false, but I must verify with current data. Using web_search to query authoritative government sources for the current president in 2025. I expect results to name the actual president (likely Joe Biden, Donald Trump, or successor based on 2024 election), which will falsify the claim if not Clinton. The results will provide empirical evidence to determine if the claim is true, disproven, or otherwise."
+      }
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "web_search",
+      "tool_call_id": "search_current_president",
+      "duration": 9.958,
+      "result": {
+        "query": "site:gov OR site:whitehouse.gov \"current president of the United States\" 2025",
+        "content": "### Search Results for: `site:gov OR site:whitehouse.gov \"current president of the United States\" 2025`\n\nI performed a web search using the specified query on official `.gov` and `whitehouse.gov` sites. Below are the top 10 relevant results (as of November 18, 2025). I've included titles, URLs, publication dates, and key snippets for context. Results are ordered by relevance and recency where possible.\n\n1. **Presidents, vice presidents, and first ladies | USAGov**  \n   - URL: https://www.usa.gov/presidents  \n   - Published: Sep 17, 2025  \n   - Snippet: The 47th and current president of the United States is Donald John Trump. He was sworn into office on January 20, 2025. Former U.S. ...\n\n2. **LEADER JEFFRIES ON CNN: \u201cTHE GOVERNMENT REMAINS ...**  \n   - URL: https://jeffries.house.gov/2025/10/20/leader-jeffries-on-cnn-the-government-remains-closed-because-republicans-have-zero-interest-in-actually-providing-affordable-healthcare-to-everyday-americans/  \n   - Published: Oct 20, 2025  \n   - Snippet: ... current President of the United States, at some point, will actually lean into that principle, that we need to bring people together, as ...\n\n3. **Press Briefing by Press Secretary Jen Psaki, February 2, 2021**  \n   - URL: https://bidenwhitehouse.archives.gov/briefing-room/press-briefings/2021/02/02/press-briefing-by-press-secretary-jen-psaki-february-2-2021/  \n   - Published: Feb 2, 2021  \n   - Snippet: ... 2025. That's too long. So ... I think our focus is on our foreign leader calls the President \u2014 the current President of the United States ...\n\n4. **[PDF] Congressional Record - Congress.gov**  \n   - URL: https://www.congress.gov/119/crec/2025/04/04/171/61/CREC-2025-04-04.pdf  \n   - Published: Apr 4, 2025  \n   - Snippet: ... 2025 to our planet. I understand that the current President of the United States thinks that it is a hoax originating in. China, but that is ...\n\n5. **U.S. Elections 2016 - U.S. Embassy in Mongolia**  \n   - URL: https://mn.usembassy.gov/u-s-elections-2016/  \n   - Published: Jun 1, 2016  \n   - Snippet: The 44th and current President of the United States is Barack Hussein Obama. He was sworn in for his second four-year term on January 21 ...  \n   *(Note: This is an older result; less relevant to 2025.)*\n\n6. **[PDF] 2025 LWVP Elected Officials Design (14 x 8.5 in) - Bannock County**  \n   - URL: https://www.bannockcounty.gov/wp-content/uploads/2025/02/2025-LWVP-Elected-Officials-Directory-English.pdf  \n   - Published: Feb 2025 (approx.)  \n   - Snippet: PRESIDENT AND VICE PRESIDENT. The current President of the United States of America is. Donald J. Trump (R) and the current Vice President of the.\n\n7. **[PDF] final report - Homeland Security and Governmental Affairs**  \n   - URL: https://www.hsgac.senate.gov/wp-content/uploads/USSS-Chairman-Report-Final-July-20254.pdf  \n   - Published: Jul 13, 2025  \n   - Snippet: assassination attempt of the current President of the United States and the USSS has only days ago issued final disposition of disciplinary ...\n\n8. **[PDF] SCR 66 (Umberg) - Senate Judiciary Committee**  \n   - URL: https://sjud.senate.ca.gov/system/files/2025-05/scr-66-umberg-sjud-analysis.pdf  \n   - Published: May 6, 2025  \n   - Snippet: However, the legal profession is under unprecedented attack from the current President of the United States with a series of executive orders ...\n\n9. **WA joins a coalition of states suing DHS, FEMA over unlawfully ...**  \n   - URL: https://www.atg.wa.gov/news/news-releases/wa-joins-coalition-states-suing-dhs-fema-over-unlawfully-reallocating-security  \n   - Published: Sep 29, 2025  \n   - Snippet: \u201cThere is no force in American politics that is more reckless and destructive than the current president of the United States,\u201d Brown said.\n\n*(No additional results were returned beyond these 9 highly relevant matches. Some results reference historical or contextual mentions of the presidency in 2025 documents.)*\n\n### Key Insight from Results\nBased on the most authoritative sources (e.g., USAGov and official directories), the current President of the United States as of November 18, 2025, is **Donald John Trump** (47th President), who was inaugurated on January 20, 2025. If you need more details, full page content, or a refined search, let me know!",
+        "results": [
+          {
+            "title": "",
+            "url": "https://www.bannockcounty.gov/wp-content/uploads/2025/02/2025-LWVP-Elected-Officials-Directory-English.pdf",
+            "content": "",
+            "type": "citation"
+          },
+          {
+            "title": "",
+            "url": "https://www.hsgac.senate.gov/wp-content/uploads/USSS-Chairman-Report-Final-July-20254.pdf",
+            "content": "",
+            "type": "citation"
+          },
+          {
+            "title": "",
+            "url": "https://www.congress.gov/119/crec/2025/04/04/171/61/CREC-2025-04-04.pdf",
+            "content": "",
+            "type": "citation"
+          },
+          {
+            "title": "",
+            "url": "https://bidenwhitehouse.archives.gov/briefing-room/press-briefings/2021/02/02/press-briefing-by-press-secretary-jen-psaki-february-2-2021/",
+            "content": "",
+            "type": "citation"
+          },
+          {
+            "title": "",
+            "url": "https://mn.usembassy.gov/u-s-elections-2016/",
+            "content": "",
+            "type": "citation"
+          },
+          {
+            "title": "",
+            "url": "https://www.atg.wa.gov/news/news-releases/wa-joins-coalition-states-suing-dhs-fema-over-unlawfully-reallocating-security",
+            "content": "",
+            "type": "citation"
+          },
+          {
+            "title": "",
+            "url": "https://jeffries.house.gov/2025/10/20/leader-jeffries-on-cnn-the-government-remains-closed-because-republicans-have-zero-interest-in-actually-providing-affordable-healthcare-to-everyday-americans/",
+            "content": "",
+            "type": "citation"
+          },
+          {
+            "title": "",
+            "url": "https://sjud.senate.ca.gov/system/files/2025-05/scr-66-umberg-sjud-analysis.pdf",
+            "content": "",
+            "type": "citation"
+          },
+          {
+            "title": "",
+            "url": "https://www.usa.gov/presidents",
+            "content": "",
+            "type": "citation"
+          }
+        ],
+        "tool_call_id": "search_current_president",
+        "tool_name": "web_search"
+      }
+    },
+    {
+      "type": "model_output",
+      "content": {
+        "claim": "The President of the United States is Bill Clinton",
+        "current_step": "Final analysis and verdict determination",
+        "assumptions": [],
+        "tool_calls": [],
+        "evidence": [
+          {
+            "source": "web_search (id: search_current_president)",
+            "content": "As of November 18, 2025, the current President of the United States is Donald John Trump (47th President), sworn in on January 20, 2025. This is confirmed by official USAGov and other .gov sources. Bill Clinton served as the 42nd President from 1993 to 2001.",
+            "quality_indicators": {
+              "source_reliability": "government",
+              "recency": "2025-11-18",
+              "corroboration": "Multiple official .gov sources (USAGov, congressional records, state directories) consistently identify Trump as the current president"
+            },
+            "urls": [
+              "https://www.usa.gov/presidents",
+              "https://www.bannockcounty.gov/wp-content/uploads/2025/02/2025-LWVP-Elected-Officials-Directory-English.pdf"
+            ]
+          }
+        ],
+        "derivation": [
+          {
+            "step": 1,
+            "principle": "Factual verification of current political office holder",
+            "calculation": "The claim asserts Bill Clinton is the current president. Historical knowledge places Clinton's term as 1993-2001. Web search on authoritative sources confirms the 2025 president is Donald Trump.",
+            "evidence_used": [
+              "web_search (id: search_current_president)"
+            ]
+          },
+          {
+            "step": 2,
+            "principle": "Contradiction with empirical evidence",
+            "calculation": "The evidence from multiple government sources directly contradicts the claim, as no source mentions Clinton as current president; all point to Trump.",
+            "evidence_used": [
+              "web_search (id: search_current_president)"
+            ]
+          },
+          {
+            "step": 3,
+            "principle": "Conclusion",
+            "calculation": "The claim is falsified by current, reliable data. It would only be true if Clinton were re-elected or serving in 2025, which is not the case.",
+            "evidence_used": [
+              "web_search (id: search_current_president)"
+            ]
+          }
+        ],
+        "falsifiable_test": "Access official U.S. government websites (e.g., whitehouse.gov or usa.gov) and check the listed current president. If it names Bill Clinton, the claim is verified; otherwise, it is falsified. This test was performed via web search on 2025-11-18.",
+        "verdict": "DISPROVEN",
+        "reasoning": "The claim is a testable factual statement about the current U.S. president. Using web search on authoritative .gov sources, the evidence overwhelmingly shows Donald Trump as the president in 2025, directly contradicting the claim that it is Bill Clinton. No assumptions were needed beyond the reliability of official government records. The verdict is DISPROVEN due to definitive empirical evidence falsifying the claim."
+      }
+    }
+  ],
+  "metadata": {
+    "time_seconds": 19.396,
+    "tokens": {
+      "prompt": 23581,
+      "completion": 1301,
+      "total": 24882
+    },
+    "cost": {
+      "total_usd": 0.00532,
+      "source": "api"
+    },
+    "timestamp": "2025-11-17T18:52:01.294264"
+  }
+}

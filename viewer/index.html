@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="View and navigate computational proofs">
+    <title>Proof Viewer</title>
+    <link rel="stylesheet" href="viewer.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header role="banner">
+            <h1>Proof Viewer</h1>
+            <nav class="navigation" aria-label="Proof navigation">
+                <button id="prevBtn" class="nav-btn" disabled aria-label="Previous proof">Previous</button>
+                <span id="proofCounter" aria-live="polite" aria-atomic="true">0 / 0</span>
+                <button id="nextBtn" class="nav-btn" disabled aria-label="Next proof">Next</button>
+            </nav>
+        </header>
+
+        <main id="proofContainer" role="main">
+            <div class="loading" aria-live="polite">Loading proof...</div>
+        </main>
+    </div>
+
+    <script src="viewer.js"></script>
+</body>
+</html>
+

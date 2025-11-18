@@ -12,17 +12,8 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-LOG_DIR = "logs"
-LOG_FILE = os.path.join(LOG_DIR, "agent-log.md")
-os.makedirs(LOG_DIR, exist_ok=True)
-
 def _write_log(message: str) -> None:
-    try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(message)
-            f.flush()
-    except (OSError, PermissionError):
-        pass
+    pass
 
 
 def _format_json_content(content: str) -> str:
@@ -80,22 +71,14 @@ class ChatAgent:
 
     def chat(self, user_message: str) -> Dict[str, Any]:
         if self._new_session:
-            file_exists = os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > 0
-            with open(LOG_FILE, "a", encoding="utf-8") as f:
-                if file_exists:
-                    f.write(f"\n\n# Chat Session\n\n## User Message\n{user_message}\n\n")
-                else:
-                    f.write(f"# Chat Session\n\n## User Message\n{user_message}\n\n")
             self._new_session = False
-        else:
-            with open(LOG_FILE, "a", encoding="utf-8") as f:
-                f.write(f"## User Message\n{user_message}\n\n")
         
         start_time = time.time()
         self.messages.append({"role": "user", "content": user_message})
         
         prompt_tokens = 0
         completion_tokens = 0
+        total_cost = 0.0
         
         while True:
             try:
@@ -104,12 +87,20 @@ class ChatAgent:
                     messages=self.messages,
                     tools=self.tool_schemas,
                     tool_choice="auto",
+                    extra_body={
+                        "usage": {
+                            "include": True
+                        }
+                    },
                 )
                 
                 usage = getattr(response, "usage", None)
                 if usage:
                     prompt_tokens += getattr(usage, "prompt_tokens", 0)
                     completion_tokens += getattr(usage, "completion_tokens", 0)
+                    api_cost = getattr(usage, "cost", None)
+                    if api_cost is not None:
+                        total_cost += api_cost
                 
                 message = response.choices[0].message
                 message_dict = message.model_dump() if hasattr(message, "model_dump") else message
@@ -119,7 +110,7 @@ class ChatAgent:
                 content = message.content or ""
                 
                 if not tool_calls:
-                    result = self._build_result(content, prompt_tokens, completion_tokens, start_time)
+                    result = self._build_result(content, prompt_tokens, completion_tokens, start_time, total_cost if total_cost > 0 else None)
                     self._log_model_output(content, tool_calls, result)
                     return result
                 
@@ -128,9 +119,10 @@ class ChatAgent:
                 logger.info(f"Processing {len(tool_calls)} tool calls")
                 
                 for tool_call in tool_calls:
-                    tool_result, pt, ct = self._handle_tool_call(tool_call)
+                    tool_result, pt, ct, tool_cost = self._handle_tool_call(tool_call)
                     prompt_tokens += pt
                     completion_tokens += ct
+                    total_cost += tool_cost
                     
                     tool_call_id = tool_call.id if hasattr(tool_call, "id") else tool_call.get("id")
                     tool_message = {
@@ -143,11 +135,11 @@ class ChatAgent:
             except Exception as e:
                 logger.error(f"Error in chat: {e}")
                 _write_log(f"## ERROR \n\n ### error \n {e}\n\n")
-                result = self._build_error_result(str(e), prompt_tokens, completion_tokens, start_time)
+                result = self._build_error_result(str(e), prompt_tokens, completion_tokens, start_time, total_cost if total_cost > 0 else None)
                 self._log_model_output("", None, result)
                 return result
 
-    def _handle_tool_call(self, tool_call: Any) -> Tuple[Dict[str, Any], int, int]:
+    def _handle_tool_call(self, tool_call: Any) -> Tuple[Dict[str, Any], int, int, float]:
         tool_call_start = time.time()
         
         if hasattr(tool_call, "function"):
@@ -161,7 +153,7 @@ class ChatAgent:
         else:
             logger.warning(f"Unexpected tool_call format: {type(tool_call)}")
             _write_log(f"## WARNING \n\n ### Unexpected tool_call format \n {type(tool_call)}\n\n")
-            return ({"error": "Invalid tool_call format"}, 0, 0)
+            return ({"error": "Invalid tool_call format"}, 0, 0, 0.0)
         
         _write_log(f"## TOOL CALL REQUEST \n\n ### id \n {tool_call_id} \n\n ### name \n {tool_name} \n\n ### args \n```json\n{json.dumps(arguments, indent=2)}\n```\n\n")
         
@@ -174,11 +166,13 @@ class ChatAgent:
             proof_tokens = metadata.get("tokens", {})
             pt = proof_tokens.get("prompt", 0)
             ct = proof_tokens.get("completion", 0)
-            logger.info(f"[COST TRACKING] Added proof tokens: prompt={pt}, completion={ct}")
+            cost_info = metadata.get("cost", {})
+            tool_cost = cost_info.get("total_usd", 0.0) if isinstance(cost_info, dict) else 0.0
+            logger.info(f"[COST TRACKING] Added proof tokens: prompt={pt}, completion={ct}, cost={tool_cost}")
             tool_result = content
         else:
             tool_result = {"error": f"Unknown tool: {tool_name}"}
-            pt, ct = 0, 0
+            pt, ct, tool_cost = 0, 0, 0.0
         
         duration = time.time() - tool_call_start
         
@@ -187,7 +181,7 @@ class ChatAgent:
         tool_result_for_log["tool_name"] = tool_name
         _write_log(f"## TOOL RESULT \n\n ### id \n {tool_call_id} \n\n ### name \n {tool_name} \n\n ### duration \n {duration:.3f}s \n\n ### result \n```json\n{json.dumps(tool_result_for_log, indent=2)}\n```\n\n")
         
-        return (tool_result, pt, ct)
+        return (tool_result, pt, ct, tool_cost)
 
     def _log_model_output(self, content: str, tool_calls: Optional[List[Any]], result: Optional[Dict[str, Any]] = None) -> None:
         tool_calls_info = ""
@@ -208,8 +202,8 @@ class ChatAgent:
         else:
             _write_log(f"## MODEL OUTPUT \n\n {formatted_content}{tool_calls_info}\n\n")
 
-    def _build_result(self, content: str, prompt_tokens: int, completion_tokens: int, start_time: float) -> Dict[str, Any]:
-        cost_info = self._calculate_costs(prompt_tokens, completion_tokens)
+    def _build_result(self, content: str, prompt_tokens: int, completion_tokens: int, start_time: float, actual_cost: Optional[float] = None) -> Dict[str, Any]:
+        cost_info = self._calculate_costs(prompt_tokens, completion_tokens, actual_cost)
         elapsed_time = time.time() - start_time
         result = {
             "response": content,
@@ -223,8 +217,8 @@ class ChatAgent:
         }
         return result
 
-    def _build_error_result(self, error: str, prompt_tokens: int, completion_tokens: int, start_time: float) -> Dict[str, Any]:
-        cost_info = self._calculate_costs(prompt_tokens, completion_tokens)
+    def _build_error_result(self, error: str, prompt_tokens: int, completion_tokens: int, start_time: float, actual_cost: Optional[float] = None) -> Dict[str, Any]:
+        cost_info = self._calculate_costs(prompt_tokens, completion_tokens, actual_cost)
         elapsed_time = time.time() - start_time
         result = {
             "error": error,
@@ -238,7 +232,13 @@ class ChatAgent:
         }
         return result
 
-    def _calculate_costs(self, prompt_tokens: int, completion_tokens: int) -> Dict[str, Any]:
+    def _calculate_costs(self, prompt_tokens: int, completion_tokens: int, actual_cost: Optional[float] = None) -> Dict[str, Any]:
+        if actual_cost is not None:
+            return {
+                "total_usd": round(actual_cost, 6),
+                "source": "api"
+            }
+        
         INPUT_COST_PER_MILLION = 0.20
         OUTPUT_COST_PER_MILLION = 0.50
         
@@ -249,6 +249,7 @@ class ChatAgent:
             "input_usd": round(input_cost, 6),
             "output_usd": round(output_cost, 6),
             "total_usd": round(input_cost + output_cost, 6),
+            "source": "estimated"
         }
 
 def chat_main() -> None:
