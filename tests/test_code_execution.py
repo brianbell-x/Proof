@@ -5,7 +5,7 @@ import os
 # Ensure tools are importable when running from tests directory
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from tool.proof_tool import CodeExecutionTool
+from proof_tool import CodeExecutionTool
 
 
 class TestCodeExecutionClaims(unittest.TestCase):

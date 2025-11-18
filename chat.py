@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from openai import OpenAI
 from dotenv import load_dotenv
-from tool.proof_tool import ProofTool, get_tool_schema as get_proof_schema
+from proof_tool import ProofTool, get_tool_schema as get_proof_schema
 
 load_dotenv()
 

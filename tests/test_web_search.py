@@ -4,7 +4,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from tool.proof_tool import WebSearchTool, get_search_schema as get_tool_schema
+from proof_tool import WebSearchTool, get_search_schema as get_tool_schema
 
 
 class TestWebSearchTool(unittest.TestCase):

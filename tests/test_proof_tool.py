@@ -8,7 +8,7 @@ from typing import Dict, Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from tool.proof_tool import ProofTool, _strip_markdown_code_fences
+from proof_tool import ProofTool, _strip_markdown_code_fences
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
