@@ -74,3 +74,5 @@ Just heard about grok 5... if it can actually take videos as input, that would b
 Kinda glad this model is this cheap tho, it makes is possible for a brokey like me to build this and possibly make it public. each proof costs less than a penny. its like $0.006~... but i am only testing... we'll see.
 
 resource limitation is gonna one of my biggest challenges on making this big. Prompting the model to account for this for now, but I hope to slowly increase the resources available to the model as I find out what it needs.
+
+Updating to grok 4.1 fast. Lol

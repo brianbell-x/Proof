@@ -43,7 +43,7 @@ def _strip_markdown_code_fences(content: str) -> str:
     return content.strip()
 
 class ChatAgent:
-    def __init__(self, api_key: str, model: str = "x-ai/grok-4-fast"):
+    def __init__(self, api_key: str, model: str = "x-ai/grok-4.1-fast"):
         self.client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key,

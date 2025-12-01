@@ -93,7 +93,7 @@ class WebSearchTool:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "x-ai/grok-4-fast:online",
+                    "model": "x-ai/grok-4.1-fast:online",
                     "messages": [
                         {
                             "role": "user",
@@ -288,7 +288,7 @@ def get_python_schema() -> Dict[str, Any]:
 
 
 class ProofTool:
-    def __init__(self, api_key: str, model: str = "x-ai/grok-4-fast"):
+    def __init__(self, api_key: str, model: str = "x-ai/grok-4.1-fast"):
         self.api_key = api_key
         self.model = model
         self.client = OpenAI(
@@ -759,4 +759,13 @@ if __name__ == "__main__":
             print(metadata)
         
         print(f"\n{'='*80}\n")
+
+
+
+
+
+
+
+
+
 
